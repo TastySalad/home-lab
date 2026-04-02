@@ -1,6 +1,9 @@
 # HashiCorp Vault (HA + integrated Raft) via official Helm chart.
-# MetalLB: pool metallb/address-pool is 192.168.0.60–192.168.0.100; .60/.69/.70 are in use → Vault LB .71
-# Chart server Service template does not set spec.loadBalancerIP; MetalLB annotation requests the IP.
+# MetalLB: pool metallb/address-pool is 192.168.0.60–192.168.0.100; .60/.69/.70 were in use → target LB .71
+# Chart does not render spec.loadBalancerIP; use metallb.io/loadBalancerIPs on the main Service only.
+# Single-node k3s: default podAntiAffinity + 3 replicas cannot schedule — use replicas: 1 (raise when you add nodes).
+# Affinity cleared so additional replicas could share the node if you increase replicas later.
+# HA creates vault-active/standby Services; disable those to avoid burning 3 MetalLB IPs (only main vault Service is LB).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -17,15 +20,22 @@ spec:
         injector:
           enabled: false
         server:
+          affinity: |
+            {}
           standalone:
             enabled: false
           ha:
             enabled: true
+            replicas: 1
             raft:
               enabled: true
               setNodeId: true
           service:
             type: LoadBalancer
+            active:
+              enabled: false
+            standby:
+              enabled: false
             annotations:
               metallb.io/loadBalancerIPs: "192.168.0.71"
         ui:
