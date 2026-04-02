@@ -41,4 +41,8 @@ iptables -C FORWARD -i "${dollar}WAN_IF" -o wg0 -p tcp -d ${wireguard_peer_tunne
 iptables -C FORWARD -i wg0 -o "${dollar}WAN_IF" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
   iptables -A FORWARD -i wg0 -o "${dollar}WAN_IF" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
+# Star topology: allow traffic between WireGuard peers (home <-> laptop via hub).
+iptables -C FORWARD -i wg0 -o wg0 -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i wg0 -o wg0 -j ACCEPT
+
 /usr/sbin/netfilter-persistent save

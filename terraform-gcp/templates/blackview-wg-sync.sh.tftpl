@@ -1,0 +1,8 @@
+#!/bin/bash
+set -eu
+EP="${endpoint_host}:${wg_port}"
+PK="${gcp_pubkey}"
+# Uses only /usr/bin/wg and /usr/bin/wg-quick (typical NOPASSWD entries); no sed on /etc.
+sudo /usr/bin/wg-quick up wg0 2>/dev/null || true
+sudo /usr/bin/wg set wg0 peer "$PK" endpoint "$EP"
+sudo /usr/bin/wg-quick save wg0

@@ -3,8 +3,10 @@
 *.tfstate
 *.tfstate.*
 *.tfvars
-!terraform-gcp/terraform.tfvars
 .terraform/
+terraform-gcp/.generated/
+.generated/
+laptop-vpn.conf
 
 # GCP key for Terraform provider (never commit)
 terraform-gcp/credentials.json

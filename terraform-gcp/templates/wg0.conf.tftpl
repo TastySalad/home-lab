@@ -8,3 +8,8 @@ ListenPort = ${wireguard_port}
 PublicKey = ${blackview_public_key}
 AllowedIPs = ${peer_tunnel_ip}/32
 PersistentKeepalive = 25
+
+[Peer]
+PublicKey = ${laptop_public_key}
+AllowedIPs = 10.0.0.3/32
+PersistentKeepalive = 25

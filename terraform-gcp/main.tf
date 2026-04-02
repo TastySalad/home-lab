@@ -5,11 +5,20 @@ provider "google" {
   zone        = var.gcp_zone
 }
 
+# Derive the GCP WireGuard public key from gcp_private_key (Python + cryptography; same as wg pubkey).
+data "external" "gcp_wg_public_key" {
+  program = ["python", "${path.module}/scripts/wg_pubkey_from_private.py"]
+  query = {
+    private_key = var.gcp_private_key
+  }
+}
+
 locals {
   wg0_conf = replace(
     templatefile("${path.module}/templates/wg0.conf.tftpl", {
       gcp_private_key      = var.gcp_private_key
       blackview_public_key = var.blackview_public_key
+      laptop_public_key    = var.laptop_public_key
       wireguard_port       = var.wireguard_port
       peer_tunnel_ip       = var.wireguard_peer_tunnel_ip
     }),
@@ -29,6 +38,9 @@ locals {
     "\r",
     "",
   )
+
+  gcp_wireguard_public_key_derived = try(data.external.gcp_wg_public_key.result.pubkey, "")
+  blackview_sync_enabled           = local.gcp_wireguard_public_key_derived != ""
 }
 
 resource "google_compute_network" "lab" {
@@ -76,9 +88,17 @@ resource "google_compute_firewall" "iap_ssh" {
   target_tags   = ["lab-edge"]
 }
 
+resource "google_compute_address" "vpn_static_ip" {
+  name         = "${var.instance_name}-vpn-ip"
+  project      = var.project_id
+  region       = var.gcp_region
+  address_type = "EXTERNAL"
+  network_tier = "PREMIUM"
+}
+
 resource "google_compute_instance" "edge" {
   name         = var.instance_name
-  machine_type = "e2-micro"
+  machine_type = var.machine_type
   zone         = var.gcp_zone
 
   # Required for DNAT / forwarding to WireGuard peers (in addition to sysctl on the guest).
@@ -96,7 +116,10 @@ resource "google_compute_instance" "edge" {
 
   network_interface {
     network = google_compute_network.lab.name
-    access_config {}
+    access_config {
+      nat_ip       = google_compute_address.vpn_static_ip.address
+      network_tier = "PREMIUM"
+    }
   }
 
   metadata_startup_script = local.startup_script
@@ -111,17 +134,57 @@ resource "google_compute_instance" "edge" {
 
   depends_on = [
     google_project_iam_member.edge_log_writer,
+    google_compute_address.vpn_static_ip,
   ]
 }
 
 resource "google_service_account" "edge" {
   account_id   = replace("${var.instance_name}-sa", "_", "-")
-  display_name   = "Lab edge VM"
-  description    = "Service account for ${var.instance_name}"
+  display_name = "Lab edge VM"
+  description  = "Service account for ${var.instance_name}"
 }
 
 resource "google_project_iam_member" "edge_log_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"
   member  = "serviceAccount:${google_service_account.edge.email}"
+}
+
+resource "local_file" "blackview_wg_sync" {
+  count = local.blackview_sync_enabled ? 1 : 0
+
+  filename             = abspath("${path.module}/.generated/blackview-wg-sync.sh")
+  file_permission      = "0644"
+  directory_permission = "0755"
+  content = replace(
+    templatefile("${path.module}/templates/blackview-wg-sync.sh.tftpl", {
+      endpoint_host = google_compute_address.vpn_static_ip.address
+      wg_port       = var.wireguard_port
+      gcp_pubkey    = local.gcp_wireguard_public_key_derived
+    }),
+    "\r",
+    "",
+  )
+}
+
+resource "null_resource" "sync_blackview_vpn" {
+  count = local.blackview_sync_enabled ? 1 : 0
+
+  triggers = {
+    instance_id = google_compute_instance.edge.id
+    static_ip   = google_compute_address.vpn_static_ip.address
+    pubkey      = local.gcp_wireguard_public_key_derived
+  }
+
+  depends_on = [
+    google_compute_instance.edge,
+    google_compute_address.vpn_static_ip,
+    local_file.blackview_wg_sync,
+  ]
+
+  provisioner "local-exec" {
+    interpreter = ["PowerShell", "-NoProfile", "-Command"]
+    # Remote tr strips CR from script (local_file may use CRLF on Windows).
+    command     = "$p = '${replace(local_file.blackview_wg_sync[0].filename, "'", "''")}'.Replace('\\', '/'); Get-Content -LiteralPath $p -Raw | ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${var.blackview_ssh_user}@${var.blackview_ssh_host} \"tr -d '\\r' | bash -s\""
+  }
 }

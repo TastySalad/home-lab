@@ -31,7 +31,7 @@ Clients connect to the **GCP public IP**, **TCP 25565**; traffic is forwarded ov
 1. Ensure **`credentials.json`** exists (service account **`terraform-lab-sa`**) and is **never** committed.
 2. Edit **`terraform.tfvars`**: set **`gcp_private_key`** and **`blackview_public_key`** (committed defaults are placeholders). **`project_id`** should match the project where the key was issued.
 3. The automation SA needs, at minimum, **`roles/compute.admin`**, **`roles/iam.serviceAccountUser`**, and **`roles/logging.logWriter`**. Creating the VM’s own service account and project IAM bindings also requires **`roles/iam.serviceAccountAdmin`** and **`roles/resourcemanager.projectIamAdmin`** (grant these on `terraform-lab-sa` if `terraform apply` returns permission errors).
-4. Optionally override `gcp_region` / `gcp_zone` (defaults: `us-central1` / `us-central1-c`; `e2-micro` capacity varies by zone—try `-b`/`-c`/`-f` if apply fails).
+4. Optionally override `gcp_region` / `gcp_zone` (defaults: `us-west1` / `us-west1-a`; `e2-micro` stock varies—try another zone/region or `machine_type = "e2-small"` if apply fails). **`google_compute_address.vpn_static_ip`** reserves the NAT IP; outputs **`gcp_public_ip`** match **`instance_external_ip`**.
 5. Initialize and apply:
 
 ```bash
@@ -51,6 +51,8 @@ terraform apply
 The startup script resolves the **WAN** interface from **`ip route show default`** (with a fallback) so it works when GCE uses **`ens4`** instead of **`eth0`**.
 
 **Template note:** Terraform **`.tftpl`** files do **not** treat `$$` like normal HCL strings. Literal **`$`** for **awk** (`$5`) and bash (**`$WAN_IF`**) is passed via a template variable **`dollar`** in **`main.tf`** so the guest script is not corrupted (mistaken `$$` in bash expands to the shell PID and breaks **iptables** `-i`).
+
+**Blackview sync:** When **`gcp_private_key`** is a real WireGuard key (not a placeholder), Terraform runs **`null_resource.sync_blackview_vpn`** after the edge instance exists: it renders **`templates/blackview-wg-sync.sh.tftpl`** under **`.generated/`** (gitignored) and pipes it over **SSH** (`-o StrictHostKeyChecking=no`) to **`salad@192.168.0.69`** (override with **`blackview_ssh_host`** / **`blackview_ssh_user`**), updating **`Endpoint`** and **`[Peer] PublicKey`** in **`/etc/wireguard/wg0.conf`**, then **`wg-quick down wg0`** / **`up`**. Requires **Python** + **`pip install cryptography`** on the workstation running **`terraform apply`**.
 
 ### SSH
 
@@ -75,9 +77,9 @@ Last engineering check: **2026-04-02** (automated from the dev workstation + IAP
 
 | Item | Result |
 |------|--------|
-| **GCP edge** | Instance **`lab-edge`** in **`us-central1-c`**; **public IP `34.55.173.170`** (ephemeral; run `terraform output -raw instance_external_ip` after any recreate). **UDP `34.55.173.170:51820`** for WireGuard. |
+| **GCP edge** | Reserved IP **`google_compute_address.vpn_static_ip`**; run **`terraform output -raw gcp_public_ip`** for the current address. Last apply used **`us-west1-a`** (moved from **`us-central1`** when **`e2-micro`** was unavailable). **WireGuard** listens on **UDP port 51820** on that IP. |
 | **`wg-quick@wg0` on GCP** | **Up**; **`sudo wg show`** lists the home peer key and **`AllowedIPs 10.0.0.2/32`**. |
-| **WireGuard handshake** | **No `latest handshake` yet** on the edge until the **home / Blackview** client uses **`Endpoint = 34.55.173.170:51820`** (replace the prior IP if the VM was recreated). |
+| **WireGuard handshake** | After **`terraform apply`** with real keys, **`null_resource.sync_blackview_vpn`** should set **Blackview** **`Endpoint`** to **`gcp_public_ip`**. Otherwise set **`Endpoint`** manually to **`terraform output -raw gcp_public_ip`**. |
 | **NAT / forwarding** | **`iptables -t nat`**: **DNAT** `ens4` **TCP 25565 → `10.0.0.2:25565`**; **POSTROUTING MASQUERADE** on **`wg0`**. (An earlier startup used literal `$$` in bash, which broke the `-i` interface name; **Terraform + `startup.sh.tftpl` are fixed**; a **one-time iptables remediation** was applied on the running VM.) |
 | **Ping / `nc` from GCP to `10.0.0.2`** | **Fails** until the tunnel is up (**“Destination Host Unreachable”** / **“No route to host”** is expected with the peer offline). |
 | **Blackview → `10.0.0.1`** | Run locally after the client shows a handshake: **`ping -c 3 10.0.0.1`**. |
