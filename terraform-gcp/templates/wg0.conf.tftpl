@@ -1,0 +1,10 @@
+# Rendered on the VM from Terraform templatefile(); GCP tunnel address 10.0.0.1/24
+[Interface]
+PrivateKey = ${gcp_private_key}
+Address = 10.0.0.1/24
+ListenPort = ${wireguard_port}
+
+[Peer]
+PublicKey = ${blackview_public_key}
+AllowedIPs = ${peer_tunnel_ip}/32
+PersistentKeepalive = 25

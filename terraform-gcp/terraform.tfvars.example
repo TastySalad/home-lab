@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars (gitignored) and fill in real values.
+# project_id            = "my-gcp-project"
+# gcp_private_key       = "BASE64_WIREGUARD_PRIVATE_KEY_FOR_GCP"
+# blackview_public_key  = "BASE64_WIREGUARD_PUBLIC_KEY_FOR_HOME_PEER"

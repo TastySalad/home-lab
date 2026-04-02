@@ -1,0 +1,19 @@
+# Terraform
+.tfstate*
+*.tfvars
+!terraform-gcp/terraform.tfvars
+.terraform/
+
+# GCP key for Terraform provider (never commit)
+terraform-gcp/credentials.json
+credentials.json
+
+# Kubernetes / secrets
+.kube/config
+**/.kube/config
+
+# WireGuard / SSH material (never commit)
+privatekey
+*.pem
+id_rsa
+id_ed25519
