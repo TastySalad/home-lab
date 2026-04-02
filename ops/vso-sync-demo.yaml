@@ -1,0 +1,16 @@
+# Demo VaultStaticSecret for VSO (apply with kubectl apply -f ops/vso-sync-demo.yaml).
+# Requires: KV v2 at mount `secret`, path secret/threat-intel/demo, and kubernetes auth + vso-role.
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultStaticSecret
+metadata:
+  name: demo-intel-sync
+  namespace: vault-sep
+spec:
+  vaultAuthRef: default
+  mount: secret
+  type: kv-v2
+  path: threat-intel/demo
+  refreshAfter: 30s
+  destination:
+    name: demo-synced-secret
+    create: true
