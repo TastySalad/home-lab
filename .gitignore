@@ -1,5 +1,7 @@
 # Terraform
 .tfstate*
+*.tfstate
+*.tfstate.*
 *.tfvars
 !terraform-gcp/terraform.tfvars
 .terraform/
@@ -13,6 +15,7 @@ credentials.json
 **/.kube/config
 
 # WireGuard / SSH material (never commit)
+WIREGUARD_CLIENT.local.txt
 privatekey
 *.pem
 id_rsa

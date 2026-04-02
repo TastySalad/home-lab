@@ -6,18 +6,29 @@ provider "google" {
 }
 
 locals {
-  wg0_conf = templatefile("${path.module}/templates/wg0.conf.tftpl", {
-    gcp_private_key      = var.gcp_private_key
-    blackview_public_key = var.blackview_public_key
-    wireguard_port       = var.wireguard_port
-    peer_tunnel_ip       = var.wireguard_peer_tunnel_ip
-  })
+  wg0_conf = replace(
+    templatefile("${path.module}/templates/wg0.conf.tftpl", {
+      gcp_private_key      = var.gcp_private_key
+      blackview_public_key = var.blackview_public_key
+      wireguard_port       = var.wireguard_port
+      peer_tunnel_ip       = var.wireguard_peer_tunnel_ip
+    }),
+    "\r",
+    "",
+  )
 
-  startup_script = templatefile("${path.module}/templates/startup.sh.tftpl", {
-    wg0_conf                 = local.wg0_conf
-    minecraft_port           = var.minecraft_port
-    wireguard_peer_tunnel_ip = var.wireguard_peer_tunnel_ip
-  })
+  # Strip CR: Windows-sourced templates otherwise yield exit 127 (bad shebang / command not found) on Linux.
+  startup_script = replace(
+    templatefile("${path.module}/templates/startup.sh.tftpl", {
+      wg0_conf                 = local.wg0_conf
+      minecraft_port           = var.minecraft_port
+      wireguard_peer_tunnel_ip = var.wireguard_peer_tunnel_ip
+      # .tftpl does not treat $$ like HCL strings; pass a literal $ for awk/bash.
+      dollar = "$"
+    }),
+    "\r",
+    "",
+  )
 }
 
 resource "google_compute_network" "lab" {
@@ -69,6 +80,9 @@ resource "google_compute_instance" "edge" {
   name         = var.instance_name
   machine_type = "e2-micro"
   zone         = var.gcp_zone
+
+  # Required for DNAT / forwarding to WireGuard peers (in addition to sysctl on the guest).
+  can_ip_forward = true
 
   tags = ["lab-edge"]
 

@@ -12,7 +12,7 @@ blackview_public_key = "REPLACE_WITH_BLACKVIEW_WG_PUBLIC_KEY"
 
 # Optional overrides (defaults match README / main.tf)
 # gcp_region              = "us-central1"
-# gcp_zone                = "us-central1-a"
+gcp_zone = "us-central1-c"
 # instance_name           = "lab-edge"
 # wireguard_port          = 51820
 # minecraft_port          = 25565

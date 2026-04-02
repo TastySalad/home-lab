@@ -31,7 +31,7 @@ Clients connect to the **GCP public IP**, **TCP 25565**; traffic is forwarded ov
 1. Ensure **`credentials.json`** exists (service account **`terraform-lab-sa`**) and is **never** committed.
 2. Edit **`terraform.tfvars`**: set **`gcp_private_key`** and **`blackview_public_key`** (committed defaults are placeholders). **`project_id`** should match the project where the key was issued.
 3. The automation SA needs, at minimum, **`roles/compute.admin`**, **`roles/iam.serviceAccountUser`**, and **`roles/logging.logWriter`**. Creating the VM’s own service account and project IAM bindings also requires **`roles/iam.serviceAccountAdmin`** and **`roles/resourcemanager.projectIamAdmin`** (grant these on `terraform-lab-sa` if `terraform apply` returns permission errors).
-4. Optionally override `gcp_region` / `gcp_zone` (defaults: `us-central1` / `us-central1-a`).
+4. Optionally override `gcp_region` / `gcp_zone` (defaults: `us-central1` / `us-central1-c`; `e2-micro` capacity varies by zone—try `-b`/`-c`/`-f` if apply fails).
 5. Initialize and apply:
 
 ```bash
@@ -50,6 +50,8 @@ terraform apply
 
 The startup script resolves the **WAN** interface from **`ip route show default`** (with a fallback) so it works when GCE uses **`ens4`** instead of **`eth0`**.
 
+**Template note:** Terraform **`.tftpl`** files do **not** treat `$$` like normal HCL strings. Literal **`$`** for **awk** (`$5`) and bash (**`$WAN_IF`**) is passed via a template variable **`dollar`** in **`main.tf`** so the guest script is not corrupted (mistaken `$$` in bash expands to the shell PID and breaks **iptables** `-i`).
+
 ### SSH
 
 Firewall allows **TCP 22** only from **Google IAP** (`35.235.240.0/20`). Use [IAP TCP forwarding](https://cloud.google.com/iap/docs/using-tcp-forwarding) or the console **SSH** button.
@@ -66,6 +68,25 @@ Manifests are prefixed (`00-`, `10-`, `20-`) so a directory apply creates the na
 - **Service**: `LoadBalancer` on port **25565**; add a MetalLB annotation if you assign a fixed LB IP.
 
 Ensure the **home WireGuard peer** uses tunnel address **`10.0.0.2/24`** (or change `wireguard_peer_tunnel_ip` in Terraform and keep DNAT consistent).
+
+## Verification status (lab)
+
+Last engineering check: **2026-04-02** (automated from the dev workstation + IAP).
+
+| Item | Result |
+|------|--------|
+| **GCP edge** | Instance **`lab-edge`** in **`us-central1-c`**; **public IP `34.55.173.170`** (ephemeral; run `terraform output -raw instance_external_ip` after any recreate). **UDP `34.55.173.170:51820`** for WireGuard. |
+| **`wg-quick@wg0` on GCP** | **Up**; **`sudo wg show`** lists the home peer key and **`AllowedIPs 10.0.0.2/32`**. |
+| **WireGuard handshake** | **No `latest handshake` yet** on the edge until the **home / Blackview** client uses **`Endpoint = 34.55.173.170:51820`** (replace the prior IP if the VM was recreated). |
+| **NAT / forwarding** | **`iptables -t nat`**: **DNAT** `ens4` **TCP 25565 → `10.0.0.2:25565`**; **POSTROUTING MASQUERADE** on **`wg0`**. (An earlier startup used literal `$$` in bash, which broke the `-i` interface name; **Terraform + `startup.sh.tftpl` are fixed**; a **one-time iptables remediation** was applied on the running VM.) |
+| **Ping / `nc` from GCP to `10.0.0.2`** | **Fails** until the tunnel is up (**“Destination Host Unreachable”** / **“No route to host”** is expected with the peer offline). |
+| **Blackview → `10.0.0.1`** | Run locally after the client shows a handshake: **`ping -c 3 10.0.0.1`**. |
+| **Minecraft path** | From the edge after handshake: **`nc -zv 10.0.0.2 25565`** should succeed if something listens on the home peer at **25565/tcp**. |
+| **Home `kubectl` (192.168.0.69)** | **`kubectl get svc -A \| grep minecraft`** requires a kubeconfig **`salad`** can read (e.g. copy **`/etc/rancher/k3s/k3s.yaml`** with **`--write-kubeconfig-mode 644`** or add the user to the right group). No `minecraft` Service was confirmed from this environment. |
+
+**Logs:** If **`wg0`** misbehaves on the VM: **`sudo journalctl -u wg-quick@wg0 -b --no-pager`**. Serial / startup: first boot previously logged **`Script "startup-script" failed with error: exit status 127`** due to **CRLF / `$$`** issues; that is addressed in **`main.tf`** (**`replace(..., "\r", "")`**) and the **`dollar`** template variable.
+
+**Terraform:** Changing **`metadata_startup_script`** forces **instance replacement**. After pulling these fixes, run **`terraform apply`** when you are ready to recycle the VM (watch for **per-zone `e2-micro` stockouts**).
 
 ## Security notes
 

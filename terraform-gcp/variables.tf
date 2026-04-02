@@ -23,7 +23,7 @@ variable "gcp_region" {
 variable "gcp_zone" {
   description = "GCP zone within the region."
   type        = string
-  default     = "us-central1-a"
+  default     = "us-central1-c"
 }
 
 variable "instance_name" {
