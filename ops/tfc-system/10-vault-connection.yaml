@@ -1,0 +1,9 @@
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultConnection
+metadata:
+  name: default
+  namespace: tfc-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  address: http://vault.vault.svc.cluster.local:8200

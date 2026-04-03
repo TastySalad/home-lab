@@ -1,0 +1,25 @@
+# Namespace, Vault auth SA, VaultConnection/VaultAuth, VaultStaticSecret for TFC agent token.
+# Prerequisite: Vault kubernetes auth role vso-role must allow namespace tfc-system for SA
+# vault-secrets-operator-controller-manager (see ops/tfc-system/05-vault-kubernetes-sa.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tfc-system
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:TastySalad/home-lab.git
+    targetRevision: main
+    path: ops/tfc-system
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tfc-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

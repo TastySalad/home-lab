@@ -1,0 +1,33 @@
+# Local Helm chart (ops/helm/terraform-cloud-agent): official image hashicorp/tfc-agent.
+# Sync after tfc-system so VaultStaticSecret can populate tfc-agent-token.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: terraform-cloud-agent
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:TastySalad/home-lab.git
+    targetRevision: main
+    path: ops/helm/terraform-cloud-agent
+    helm:
+      values: |
+        agentPoolName: "blackview-pool"
+        replicaCount: 1
+        token:
+          secretName: "tfc-agent-token"
+          secretKey: "token"
+        agentCpuServiceLimit: "500m"
+        agentMemoryServiceLimit: "512Mi"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tfc-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: terraform-cloud-agent
+description: HCP Terraform agent using hashicorp/tfc-agent (local chart; HashiCorp helm repo has no standalone agent chart).
+type: application
+version: 0.1.0
+appVersion: "1.28"

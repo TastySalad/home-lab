@@ -1,0 +1,10 @@
+# Service account token used by VaultAuth in this namespace (same name as VSO's chart SA).
+# Extend Vault auth/kubernetes role vso-role: add bound_service_account_namespaces=tfc-system
+# (bound_service_account_names can stay vault-secrets-operator-controller-manager).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-secrets-operator-controller-manager
+  namespace: tfc-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"

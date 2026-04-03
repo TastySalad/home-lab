@@ -1,0 +1,15 @@
+# Mirrors the common values shape for TFC agent Helm deployments; maps to hashicorp/tfc-agent.
+agentPoolName: blackview-pool
+replicaCount: 1
+
+token:
+  secretName: tfc-agent-token
+  secretKey: token
+
+agentCpuServiceLimit: "500m"
+agentMemoryServiceLimit: "512Mi"
+
+image:
+  repository: hashicorp/tfc-agent
+  tag: latest
+  pullPolicy: IfNotPresent

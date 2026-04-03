@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tfc-agent
+  labels:
+    app.kubernetes.io/name: tfc-agent
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    tfc.hashicorp.com/agent-pool: {{ .Values.agentPoolName | quote }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tfc-agent
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tfc-agent
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        tfc.hashicorp.com/agent-pool: {{ .Values.agentPoolName | quote }}
+    spec:
+      containers:
+        - name: tfc-agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: TFC_AGENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.token.secretName }}
+                  key: {{ .Values.token.secretKey }}
+            - name: TFC_AGENT_NAME
+              value: {{ printf "%s-k3s" .Values.agentPoolName | quote }}
+          resources:
+            limits:
+              cpu: {{ .Values.agentCpuServiceLimit | quote }}
+              memory: {{ .Values.agentMemoryServiceLimit | quote }}
