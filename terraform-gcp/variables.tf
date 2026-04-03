@@ -3,6 +3,13 @@ variable "project_id" {
   type        = string
 }
 
+variable "gcp_credentials_file" {
+  type        = string
+  nullable    = true
+  default     = null
+  description = "Path to GCP service account JSON. When null, uses credentials.json beside this module if present, else application default credentials (e.g. GOOGLE_CREDENTIALS in HCP Terraform)."
+}
+
 variable "gcp_private_key" {
   description = "WireGuard private key for this GCP instance (Interface section). Keep secret; pass via TF_VAR or encrypted tfvars."
   type        = string

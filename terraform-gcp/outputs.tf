@@ -32,3 +32,8 @@ output "blackview_sync_ran" {
   description = "Whether local WireGuard sync resources were created (requires valid gcp_private_key and Python)."
   value       = local.blackview_sync_enabled
 }
+
+output "wireguard_gcp_internal_ip" {
+  description = "GCE primary internal IP used for SSH WireGuard provisioning."
+  value       = google_compute_instance.edge.network_interface[0].network_ip
+}

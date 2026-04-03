@@ -1,5 +1,12 @@
+locals {
+  # Prefer explicit path; else credentials.json next to this module; else ADC (GOOGLE_APPLICATION_CREDENTIALS / TFC env).
+  gcp_credentials_json = var.gcp_credentials_file != null ? file(var.gcp_credentials_file) : (
+    fileexists("${path.module}/credentials.json") ? file("${path.module}/credentials.json") : null
+  )
+}
+
 provider "google" {
-  credentials = file("${path.module}/credentials.json")
+  credentials = local.gcp_credentials_json
   project     = var.project_id
   region      = var.gcp_region
   zone        = var.gcp_zone
@@ -9,16 +16,16 @@ provider "google" {
 data "external" "gcp_wg_public_key" {
   program = ["python", "${path.module}/scripts/wg_pubkey_from_private.py"]
   query = {
-    private_key = var.gcp_private_key
+    private_key = local.wg_private_key
   }
 }
 
 locals {
   wg0_conf = replace(
     templatefile("${path.module}/templates/wg0.conf.tftpl", {
-      gcp_private_key      = var.gcp_private_key
-      blackview_public_key = var.blackview_public_key
-      laptop_public_key    = var.laptop_public_key
+      gcp_private_key      = local.wg_private_key
+      blackview_public_key = local.blackview_public_key
+      laptop_public_key    = local.laptop_public_key
       wireguard_port       = var.wireguard_port
       peer_tunnel_ip       = var.wireguard_peer_tunnel_ip
     }),
@@ -185,6 +192,6 @@ resource "null_resource" "sync_blackview_vpn" {
   provisioner "local-exec" {
     interpreter = ["PowerShell", "-NoProfile", "-Command"]
     # Remote tr strips CR from script (local_file may use CRLF on Windows).
-    command     = "$p = '${replace(local_file.blackview_wg_sync[0].filename, "'", "''")}'.Replace('\\', '/'); Get-Content -LiteralPath $p -Raw | ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${var.blackview_ssh_user}@${var.blackview_ssh_host} \"tr -d '\\r' | bash -s\""
+    command = "$p = '${replace(local_file.blackview_wg_sync[0].filename, "'", "''")}'.Replace('\\', '/'); Get-Content -LiteralPath $p -Raw | ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${var.blackview_ssh_user}@${var.blackview_ssh_host} \"tr -d '\\r' | bash -s\""
   }
 }

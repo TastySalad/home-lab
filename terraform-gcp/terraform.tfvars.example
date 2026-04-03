@@ -1,5 +1,27 @@
 # Copy to terraform.tfvars (gitignored) and fill in real values.
+#
+# --- Local apply (no Vault) ---
 # project_id            = "my-gcp-project"
-# gcp_private_key       = "BASE64_WIREGUARD_PRIVATE_KEY_FOR_GCP"
-# blackview_public_key  = "BASE64_WIREGUARD_PUBLIC_KEY_FOR_HOME_PEER"
-# laptop_public_key     = "BASE64_WIREGUARD_PUBLIC_KEY_FOR_ROAMING_LAPTOP"
+# gcp_private_key       = "WIREGUARD_PRIVATE_KEY_FOR_GCP_INTERFACE"
+# blackview_public_key  = "WIREGUARD_PUBLIC_KEY_FOR_HOME_PEER"
+# laptop_public_key     = "WIREGUARD_PUBLIC_KEY_FOR_ROAMING_LAPTOP"
+# gcp_vm_ssh_private_key = <<-EOT
+# -----BEGIN OPENSSH PRIVATE KEY-----
+# ...
+# -----END OPENSSH PRIVATE KEY-----
+# EOT
+#
+# --- HCP Terraform Agent + Vault (KV v2 mount secret, path terraform) ---
+# Workspace env: TF_VAR_vault_token=<token with read on secret/data/terraform>
+# Optional env: GOOGLE_CREDENTIALS=<GCP SA JSON> (when credentials.json not in repo)
+#
+# Expected secret/terraform keys (override names with vault_key_* variables):
+#   wg-private-key           -> GCP endpoint WireGuard private key
+#   blackview-public-key     -> Blackview peer public key
+#   laptop-wg-public-key     -> laptop peer public key (optional; else use laptop_public_key var)
+#   gcp-vm-ssh-private-key   -> PEM for SSH to GCE instance internal IP (enables remote WireGuard apply)
+#
+# Optional toggles:
+# wireguard_remote_provisioner_enabled = true   # SSH wg0.conf + systemctl (needs routable internal IP from agent)
+# wireguard_verify_ping                = true   # local-exec ping wireguard_ping_target (default 10.0.0.1)
+# vault_addr                           = "http://vault.vault.svc.cluster.local:8200"
