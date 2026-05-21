@@ -1,0 +1,35 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: kibana
+  namespace: elastic-system
+  labels:
+    app.kubernetes.io/component: kibana
+    app.kubernetes.io/part-of: home-lab-monitoring
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`kb.home.10.0.0.2.nip.io`)
+      kind: Rule
+      services:
+        - name: home-lab-kb-http
+          port: 5601
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana-wg
+  namespace: elastic-system
+  labels:
+    app.kubernetes.io/component: kibana
+    app.kubernetes.io/part-of: home-lab-monitoring
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 5601
+      protocol: TCP
+      targetPort: 5601
+  selector:
+    common.k8s.elastic.co/type: kibana
+    kibana.k8s.elastic.co/name: home-lab

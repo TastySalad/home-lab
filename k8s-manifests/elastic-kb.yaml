@@ -1,0 +1,35 @@
+apiVersion: kibana.k8s.elastic.co/v1
+kind: Kibana
+metadata:
+  name: home-lab
+  namespace: elastic-system
+  labels:
+    app.kubernetes.io/component: kibana
+    app.kubernetes.io/part-of: home-lab-monitoring
+spec:
+  version: 8.17.4
+  count: 1
+  elasticsearchRef:
+    name: home-lab
+  podTemplate:
+    spec:
+      nodeSelector:
+        role: worker
+      tolerations:
+        - key: "role"
+          operator: "Equal"
+          value: "worker"
+          effect: "NoSchedule"
+      containers:
+        - name: kibana
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 200m
+            limits:
+              memory: 1Gi
+              cpu: 1
+  http:
+    tls:
+      selfSignedCertificate:
+        disabled: true

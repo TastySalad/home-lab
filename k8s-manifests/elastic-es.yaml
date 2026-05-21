@@ -1,0 +1,78 @@
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: home-lab
+  namespace: elastic-system
+  labels:
+    app.kubernetes.io/component: elasticsearch
+    app.kubernetes.io/part-of: home-lab-monitoring
+spec:
+  version: 8.17.4
+  nodeSets:
+    - name: stable
+      count: 1
+      config:
+        node.roles: ["master", "data", "ingress", "ml"]
+        node.store.allow_mmap: false
+        xpack.security.authc:
+          anonymous:
+            username: anonymous
+            roles: viewer
+            authz_exception: false
+      podTemplate:
+        spec:
+          nodeSelector:
+            role: stable
+          tolerations:
+            - key: "role"
+              operator: "Equal"
+              value: "stable"
+              effect: "NoSchedule"
+          containers:
+            - name: elasticsearch
+              env:
+                - name: ES_JAVA_OPTS
+                  value: "-Xms2g -Xmx2g"
+              resources:
+                requests:
+                  memory: 3Gi
+                  cpu: 500m
+                limits:
+                  memory: 4Gi
+                  cpu: 2
+          volumes:
+            - name: elasticsearch-data
+              emptyDir: {}
+    - name: worker
+      count: 1
+      config:
+        node.roles: ["data", "ingress"]
+        node.store.allow_mmap: false
+      podTemplate:
+        spec:
+          nodeSelector:
+            role: worker
+          tolerations:
+            - key: "role"
+              operator: "Equal"
+              value: "worker"
+              effect: "NoSchedule"
+          containers:
+            - name: elasticsearch
+              env:
+                - name: ES_JAVA_OPTS
+                  value: "-Xms1g -Xmx1g"
+              resources:
+                requests:
+                  memory: 2Gi
+                  cpu: 500m
+                limits:
+                  memory: 3Gi
+                  cpu: 2
+          volumes:
+            - name: elasticsearch-data
+              emptyDir: {}
+  http:
+    tls:
+      selfSignedCertificate:
+        disabled: true
