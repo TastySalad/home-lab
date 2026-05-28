@@ -11,15 +11,10 @@ spec:
   count: 1
   elasticsearchRef:
     name: home-lab
+  config:
+    server.publicBaseUrl: "http://10.0.0.2:5601"
   podTemplate:
     spec:
-      nodeSelector:
-        role: worker
-      tolerations:
-        - key: "role"
-          operator: "Equal"
-          value: "worker"
-          effect: "NoSchedule"
       containers:
         - name: kibana
           resources:

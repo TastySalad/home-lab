@@ -1,0 +1,69 @@
+apiVersion: agent.k8s.elastic.co/v1alpha1
+kind: Agent
+metadata:
+  name: fleet-server
+  namespace: elastic-system
+  labels:
+    app.kubernetes.io/component: fleet-server
+    app.kubernetes.io/part-of: home-lab-monitoring
+spec:
+  version: 8.17.4
+  kibanaRef:
+    name: home-lab
+  elasticsearchRefs:
+    - name: home-lab
+  mode: fleet
+  fleetServerEnabled: true
+  policyID: fleet-server-policy
+  deployment:
+    replicas: 1
+    podTemplate:
+      spec:
+        nodeSelector:
+          role: stable
+        containers:
+          - name: agent
+            resources:
+              requests:
+                memory: 512Mi
+                cpu: 200m
+              limits:
+                memory: 1Gi
+                cpu: 1
+  http:
+    tls:
+      selfSignedCertificate:
+        disabled: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleet-server-wg
+  namespace: elastic-system
+  labels:
+    app.kubernetes.io/component: fleet-server
+    app.kubernetes.io/part-of: home-lab-monitoring
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8220
+      protocol: TCP
+      targetPort: 8220
+  selector:
+    common.k8s.elastic.co/type: agent
+    agent.k8s.elastic.co/name: fleet-server
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: fleet-server
+  namespace: elastic-system
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`fleet.home.10.0.0.2.nip.io`)
+      kind: Rule
+      services:
+        - name: fleet-server-wg
+          port: 8220
