@@ -1,0 +1,35 @@
+# Tailscale Kubernetes Operator — manages Tailscale ingress/egress proxies for K8s services.
+# Auth: auth key stored in pre-created operator-oauth Secret (client_secret).
+# Tag: k8s-operator (must be owned by autogroup:admin in ACL).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tailscale-operator
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://pkgs.tailscale.com/helmcharts
+    chart: tailscale-operator
+    targetRevision: 1.82.0
+    helm:
+      values: |
+        installCRDs: true
+        operatorConfig:
+          defaultTags:
+            - "tag:k8s-operator"
+          hostname: "kestrel-lab-operator"
+          logging: "info"
+        proxyConfig:
+          defaultTags: "tag:k8s"
+        apiServerProxyConfig:
+          mode: "false"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tailscale
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
