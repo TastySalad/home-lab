@@ -1,0 +1,70 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"batch/v1","kind":"CronJob","metadata":{"annotations":{},"name":"vault-autounseal","namespace":"vault"},"spec":{"concurrencyPolicy":"Forbid","failedJobsHistoryLimit":3,"jobTemplate":{"spec":{"activeDeadlineSeconds":30,"backoffLimit":2,"template":{"spec":{"containers":[{"args":["if vault status -tls-skip-verify -format=json 2\u003e/dev/null | grep -q '\"sealed\": true'; then\n  echo \"Vault is sealed, unsealing...\"\n  vault operator unseal -tls-skip-verify \"$UNSEAL_KEY_1\" \u003e/dev/null 2\u003e\u00261\n  vault operator unseal -tls-skip-verify \"$UNSEAL_KEY_2\" \u003e/dev/null 2\u003e\u00261\n  vault operator unseal -tls-skip-verify \"$UNSEAL_KEY_3\" \u003e/dev/null 2\u003e\u00261\n  echo \"Unseal complete\"\nelse\n  echo \"Vault is unsealed, nothing to do\"\nfi\n"],"command":["/bin/sh","-c"],"env":[{"name":"VAULT_ADDR","value":"http://vault.vault.svc.cluster.local:8200"},{"name":"UNSEAL_KEY_1","valueFrom":{"secretKeyRef":{"key":"UNSEAL_KEY_1","name":"vault-unseal-keys"}}},{"name":"UNSEAL_KEY_2","valueFrom":{"secretKeyRef":{"key":"UNSEAL_KEY_2","name":"vault-unseal-keys"}}},{"name":"UNSEAL_KEY_3","valueFrom":{"secretKeyRef":{"key":"UNSEAL_KEY_3","name":"vault-unseal-keys"}}}],"image":"hashicorp/vault:1.18.1","imagePullPolicy":"IfNotPresent","name":"unseal","securityContext":{"allowPrivilegeEscalation":false}}],"restartPolicy":"Never"}}}},"schedule":"*/1 * * * *","successfulJobsHistoryLimit":1}}
+  name: vault-autounseal
+  namespace: vault
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      creationTimestamp: null
+    spec:
+      activeDeadlineSeconds: 30
+      backoffLimit: 2
+      template:
+        metadata:
+          creationTimestamp: null
+        spec:
+          containers:
+          - args:
+            - |
+              if vault status -tls-skip-verify -format=json 2>/dev/null | grep -q '"sealed": true'; then
+                echo "Vault is sealed, unsealing..."
+                vault operator unseal -tls-skip-verify "$UNSEAL_KEY_1" >/dev/null 2>&1
+                vault operator unseal -tls-skip-verify "$UNSEAL_KEY_2" >/dev/null 2>&1
+                vault operator unseal -tls-skip-verify "$UNSEAL_KEY_3" >/dev/null 2>&1
+                echo "Unseal complete"
+              else
+                echo "Vault is unsealed, nothing to do"
+              fi
+            command:
+            - /bin/sh
+            - -c
+            env:
+            - name: VAULT_ADDR
+              value: http://vault.vault.svc.cluster.local:8200
+            - name: UNSEAL_KEY_1
+              valueFrom:
+                secretKeyRef:
+                  key: UNSEAL_KEY_1
+                  name: vault-unseal-keys
+            - name: UNSEAL_KEY_2
+              valueFrom:
+                secretKeyRef:
+                  key: UNSEAL_KEY_2
+                  name: vault-unseal-keys
+            - name: UNSEAL_KEY_3
+              valueFrom:
+                secretKeyRef:
+                  key: UNSEAL_KEY_3
+                  name: vault-unseal-keys
+            image: hashicorp/vault:1.18.1
+            imagePullPolicy: IfNotPresent
+            name: unseal
+            resources: {}
+            securityContext:
+              allowPrivilegeEscalation: false
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+  schedule: '*/1 * * * *'
+  successfulJobsHistoryLimit: 1
+  suspend: false

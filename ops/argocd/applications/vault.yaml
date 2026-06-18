@@ -4,6 +4,7 @@
 # Single-node k3s: default podAntiAffinity + 3 replicas cannot schedule — use replicas: 1 (raise when you add nodes).
 # Affinity cleared so additional replicas could share the node if you increase replicas later.
 # HA creates vault-active/standby Services; disable those to avoid burning 3 MetalLB IPs (only main vault Service is LB).
+# Auto-unseal: CronJob vault-autounseal checks every 60s and unseals using keys from vault-unseal-keys Secret.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

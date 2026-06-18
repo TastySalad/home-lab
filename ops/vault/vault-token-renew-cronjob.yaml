@@ -1,0 +1,57 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"batch/v1","kind":"CronJob","metadata":{"annotations":{},"name":"vault-token-renew","namespace":"vault"},"spec":{"concurrencyPolicy":"Forbid","failedJobsHistoryLimit":5,"jobTemplate":{"spec":{"activeDeadlineSeconds":30,"backoffLimit":2,"template":{"spec":{"containers":[{"args":["set -e\necho \"Renewing Vault token...\"\nRESULT=$(vault token renew -format=json 2\u003e\u00261)\necho \"$RESULT\"\nTTL=$(echo \"$RESULT\" | grep -o '\"lease_duration\":[0-9]*' | cut -d: -f2)\necho \"Token renewed. New TTL: ${TTL}s ($((TTL/3600))h)\"\n"],"command":["/bin/sh","-c"],"env":[{"name":"VAULT_ADDR","value":"http://vault.vault.svc.cluster.local:8200"},{"name":"VAULT_TOKEN","valueFrom":{"secretKeyRef":{"key":"VAULT_TOKEN","name":"vault-kestrel-token"}}}],"image":"hashicorp/vault:1.18.1","imagePullPolicy":"IfNotPresent","name":"renew","securityContext":{"allowPrivilegeEscalation":false}}],"restartPolicy":"Never"}}}},"schedule":"0 3 * * *","successfulJobsHistoryLimit":3}}
+  name: vault-token-renew
+  namespace: vault
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    metadata:
+      creationTimestamp: null
+    spec:
+      activeDeadlineSeconds: 30
+      backoffLimit: 2
+      template:
+        metadata:
+          creationTimestamp: null
+        spec:
+          containers:
+          - args:
+            - |
+              set -e
+              echo "Renewing Vault token..."
+              RESULT=$(vault token renew -format=json 2>&1)
+              echo "$RESULT"
+              TTL=$(echo "$RESULT" | grep -o '"lease_duration":[0-9]*' | cut -d: -f2)
+              echo "Token renewed. New TTL: ${TTL}s ($((TTL/3600))h)"
+            command:
+            - /bin/sh
+            - -c
+            env:
+            - name: VAULT_ADDR
+              value: http://vault.vault.svc.cluster.local:8200
+            - name: VAULT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: VAULT_TOKEN
+                  name: vault-kestrel-token
+            image: hashicorp/vault:1.18.1
+            imagePullPolicy: IfNotPresent
+            name: renew
+            resources: {}
+            securityContext:
+              allowPrivilegeEscalation: false
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+  schedule: 0 3 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false

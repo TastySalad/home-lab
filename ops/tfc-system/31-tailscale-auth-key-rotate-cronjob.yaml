@@ -1,0 +1,89 @@
+# CronJob: rotate Tailscale auth keys every 12h.
+# Generates fresh pre-approved auth keys with 24h TTL, stores in Vault.
+# 24h TTL + 12h rotation = one failure tolerated before manual intervention.
+# Two keys: aws-lab (general AWS devices) + k3s-node (K3s cluster nodes).
+# Managed by ArgoCD via ops/tfc-system/.
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tailscale-auth-key-rotate
+  namespace: tfc-system
+spec:
+  schedule: "0 */12 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 60
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: rotate
+              image: alpine:3.20
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -e
+                  apk add --no-cache curl jq > /dev/null 2>&1
+
+                  echo "$(date): Rotating Tailscale auth keys..."
+                  VAULT_ADDR="http://vault.vault.svc.cluster.local:8200"
+
+                  # Generate aws-lab key
+                  echo "  aws-lab..."
+                  RESULT=$(curl -sf -X POST \
+                    -H "Authorization: Bearer $TS_API_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -d '{"capabilities":{"devices":{"create":{"reusable":true,"ephemeral":false,"preauthorized":true,"tags":["tag:aws-lab"]}}},"expirySeconds":86400}' \
+                    "https://api.tailscale.com/api/v2/tailnet/$TAILNET/keys")
+                  KEY=$(echo "$RESULT" | jq -r '.key')
+                  EXPIRES=$(echo "$RESULT" | jq -r '.expires')
+                  echo "    ${KEY:0:30}... expires $EXPIRES"
+
+                  curl -sf -X POST \
+                    -H "X-Vault-Token: $VAULT_ROOT_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"data\":{\"key\":\"$KEY\",\"tags\":[\"tag:aws-lab\"],\"reusable\":true,\"expires\":\"$EXPIRES\"}}" \
+                    "$VAULT_ADDR/v1/kestrel/data/tailscale/auth-key-aws-lab" > /dev/null
+
+                  # Generate k3s-node key
+                  echo "  k3s-node..."
+                  RESULT=$(curl -sf -X POST \
+                    -H "Authorization: Bearer $TS_API_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -d '{"capabilities":{"devices":{"create":{"reusable":true,"ephemeral":false,"preauthorized":true,"tags":["tag:aws-lab","tag:k3s-node"]}}},"expirySeconds":86400}' \
+                    "https://api.tailscale.com/api/v2/tailnet/$TAILNET/keys")
+                  KEY=$(echo "$RESULT" | jq -r '.key')
+                  EXPIRES=$(echo "$RESULT" | jq -r '.expires')
+                  echo "    ${KEY:0:30}... expires $EXPIRES"
+
+                  curl -sf -X POST \
+                    -H "X-Vault-Token: $VAULT_ROOT_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"data\":{\"key\":\"$KEY\",\"tags\":[\"tag:aws-lab\",\"tag:k3s-node\"],\"reusable\":true,\"expires\":\"$EXPIRES\"}}" \
+                    "$VAULT_ADDR/v1/kestrel/data/tailscale/auth-key-k3s" > /dev/null
+
+                  echo "$(date): Rotation complete"
+              env:
+                - name: VAULT_ROOT_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: vault-root-token
+                      key: ROOT_TOKEN
+                - name: TAILNET
+                  valueFrom:
+                    secretKeyRef:
+                      name: tailscale-api-token
+                      key: TAILNET
+                - name: TS_API_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: tailscale-api-token
+                      key: TS_API_TOKEN
+              securityContext:
+                allowPrivilegeEscalation: false
