@@ -21,10 +21,17 @@ data:
     info: System RAM usage alert — fires when memory exceeds threshold
   netdata-alert-webhook.sh: |
     #!/bin/bash
-    # Netdata alarm handler — POSTs to Hermes webhook for investigation
+    # Netdata alarm handler — collects diagnostics, POSTs to Hermes webhook
 
     WEBHOOK_URL="http://127.0.0.1:8644/webhooks/netdata-alerts"
     WEBHOOK_SECRET="netdata-hook-local-secret"
+
+    # Quick diagnostics
+    MEM_INFO=$(free -h 2>/dev/null | head -3)
+    TOP_PROCS=$(ps aux --sort=-%mem 2>/dev/null | head -6)
+    LOAD_INFO=$(uptime 2>/dev/null)
+    SWAP_INFO=$(free -h 2>/dev/null | grep Swap)
+    DISK_INFO=$(df -h / 2>/dev/null | tail -1)
 
     PAYLOAD=$(cat <<PAYLOAD_END
     {
@@ -33,10 +40,14 @@ data:
         "value": "${NETDATA_ALARM_VALUE:-?}",
         "status": "${NETDATA_ALARM_STATUS:-?}",
         "chart": "${NETDATA_CHART_NAME:-?}",
-        "family": "${NETDATA_FAMILY_NAME:-?}",
-        "host": "${NETDATA_HOSTNAME:-salad-playground}",
-        "machine_guid": "${NETDATA_MACHINE_GUID:-?}",
-        "transition": "${NETDATA_TRANSITION:-?}"
+        "host": "${NETDATA_HOSTNAME:-salad-playground}"
+      },
+      "diagnostics": {
+        "memory": $(echo "$MEM_INFO" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || echo "\"$MEM_INFO\""),
+        "top_processes": $(echo "$TOP_PROCS" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || echo "\"$TOP_PROCS\""),
+        "load": $(echo "$LOAD_INFO" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || echo "\"$LOAD_INFO\""),
+        "swap": $(echo "$SWAP_INFO" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || echo "\"$SWAP_INFO\""),
+        "disk": $(echo "$DISK_INFO" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || echo "\"$DISK_INFO\"")
       }
     }
     PAYLOAD_END
