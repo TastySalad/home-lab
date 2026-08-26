@@ -19,10 +19,6 @@ spec:
       containers:
         - name: netdata
           image: netdata/netdata:latest
-          ports:
-            - name: web
-              containerPort: 19999
-              protocol: TCP
           volumeMounts:
             - name: proc
               mountPath: /host/proc
