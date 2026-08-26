@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: netdata-health
+  namespace: netdata
+  labels:
+    app: netdata
+data:
+  ram.conf: |
+    # High memory alarm — triggers webhook to Hermes for investigation
+    alarm: ram_high
+    on: system.ram
+    lookup: average - 1m of used
+    units: MiB
+    every: 30s
+    crit: $this > 80
+    warn: $this > 70
+    delay: up 2m
+    repeat: warning 2m crit 2m
+    exec: /etc/netdata/scripts/netdata-alert-webhook.sh
+    info: System RAM usage alert — fires when memory exceeds threshold
+  netdata-alert-webhook.sh: |
+    #!/bin/bash
+    # Netdata alarm handler — POSTs to Hermes webhook for investigation
+
+    WEBHOOK_URL="http://127.0.0.1:8644/webhooks/netdata-alerts"
+    WEBHOOK_SECRET="netdata-hook-local-secret"
+
+    PAYLOAD=$(cat <<PAYLOAD_END
+    {
+      "alert": {
+        "name": "${NETDATA_ALARM_NAME:-unknown}",
+        "value": "${NETDATA_ALARM_VALUE:-?}",
+        "status": "${NETDATA_ALARM_STATUS:-?}",
+        "chart": "${NETDATA_CHART_NAME:-?}",
+        "family": "${NETDATA_FAMILY_NAME:-?}",
+        "host": "${NETDATA_HOSTNAME:-salad-playground}",
+        "machine_guid": "${NETDATA_MACHINE_GUID:-?}",
+        "transition": "${NETDATA_TRANSITION:-?}"
+      }
+    }
+    PAYLOAD_END
+    )
+
+    SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | cut -d' ' -f2)
+
+    curl -s -X POST "$WEBHOOK_URL" \
+      -H "Content-Type: application/json" \
+      -H "X-Hub-Signature-256: sha256=$SIGNATURE" \
+      -d "$PAYLOAD" \
+      -o /dev/null -w "%{http_code}" 2>/dev/null

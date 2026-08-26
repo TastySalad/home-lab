@@ -31,6 +31,13 @@ spec:
               readOnly: true
             - name: config
               mountPath: /etc/netdata
+            - name: health-config
+              mountPath: /etc/netdata/health.d/ram.conf
+              subPath: ram.conf
+              readOnly: true
+            - name: health-config
+              mountPath: /etc/netdata/scripts/netdata-alert-webhook.sh
+              subPath: netdata-alert-webhook.sh
           env:
             - name: NETDATA_HOSTNAME
               value: "salad-playground"
@@ -50,3 +57,7 @@ spec:
             path: /etc/os-release
         - name: config
           emptyDir: {}
+        - name: health-config
+          configMap:
+            name: netdata-health
+            defaultMode: 0755
