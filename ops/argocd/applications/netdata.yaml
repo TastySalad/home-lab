@@ -1,0 +1,29 @@
+# Netdata — real-time system monitoring dashboard.
+# DaemonSet with hostNetwork for full host metrics (CPU, memory, disk, net).
+# MetalLB: 192.168.0.63 freed after elastic-stack removal.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: netdata
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:TastySalad/home-lab.git
+    targetRevision: main
+    path: k8s-manifests
+    directory:
+      include: 'netdata-*.yaml'
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: netdata
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

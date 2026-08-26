@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: netdata
+  namespace: netdata
+  labels:
+    app: netdata
+  annotations:
+    metallb.io/loadBalancerIPs: "192.168.0.63"
+spec:
+  type: LoadBalancer
+  selector:
+    app: netdata
+  ports:
+    - name: web
+      port: 19999
+      targetPort: web
+      protocol: TCP
