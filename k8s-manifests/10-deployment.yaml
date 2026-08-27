@@ -15,18 +15,24 @@ spec:
       labels:
         app: minecraft
     spec:
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/hostname: racknerd-vps
       containers:
         - name: minecraft
           image: itzg/minecraft-server:latest
           ports:
             - name: game
               containerPort: 25565
+              hostPort: 25565
               protocol: TCP
           env:
             - name: EULA
               value: "TRUE"
             - name: MEMORY
               value: "2G"
+            - name: SERVER_PORT
+              value: "25565"
           volumeMounts:
             - name: data
               mountPath: /data
