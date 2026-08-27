@@ -1,0 +1,8 @@
+---
+# ─── Target VPS ───────────────────────────────────────
+vps_hostname: racknerd-vps
+vps_timezone: Asia/Jerusalem
+
+# ─── K3s cluster ──────────────────────────────────────
+k3s_server_address: 100.109.95.108   # home-lab Tailscale IP
+k3s_server_port: 6443

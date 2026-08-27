@@ -1,0 +1,36 @@
+---
+- name: Check if Tailscale is already installed
+  command: which tailscale
+  register: tailscale_binary
+  changed_when: false
+  failed_when: false
+
+- name: Install Tailscale
+  shell: |
+    curl -fsSL https://tailscale.com/install.sh | sh
+  when: tailscale_binary.rc != 0
+
+- name: Check if already authenticated
+  command: tailscale status 2>&1
+  register: tailscale_status
+  changed_when: false
+  failed_when: false
+
+- name: Authenticate to Tailscale
+  command: tailscale up --authkey={{ tailscale_auth_key }} --hostname={{ vps_hostname }} --accept-routes
+  register: tailscale_auth_result
+  changed_when: "'success' in tailscale_auth_result.stdout or tailscale_auth_result.rc != 0"
+  when:
+    - tailscale_auth_key is defined
+    - tailscale_auth_key != 'placeholder-set-via-vault'
+    - tailscale_status.rc != 0 or 'NeedsLogin' in tailscale_status.stdout or tailscale_status.stdout == ''
+
+- name: Wait for Tailscale IP
+  command: timeout 30 sh -c 'until tailscale ip -4 2>/dev/null; do sleep 1; done'
+  register: tailscale_ip
+  changed_when: false
+  when: tailscale_auth_key is defined and tailscale_auth_key != 'placeholder-set-via-vault'
+
+- name: Print Tailscale IP
+  debug:
+    msg: "VPS Tailscale IP: {{ tailscale_ip.stdout }}"

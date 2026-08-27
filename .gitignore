@@ -22,3 +22,8 @@ privatekey
 *.pem
 id_rsa
 id_ed25519
+
+# Ansible vault
+ops/ansible/.vault_pass
+ops/ansible/.facts_cache/
+ops/ansible/inventory/group_vars/all/vault.yml

@@ -1,0 +1,32 @@
+---
+- name: Check if K3s agent is already installed
+  command: which k3s
+  register: k3s_binary
+  changed_when: false
+  failed_when: false
+
+- name: Install K3s agent
+  shell:
+    cmd: |
+      set -e
+      curl -sfL https://get.k3s.io | \
+        K3S_URL="https://{{ k3s_server_address }}:{{ k3s_server_port }}" \
+        K3S_TOKEN="{{ k3s_token }}" \
+        K3S_NODE_NAME="{{ vps_hostname }}" \
+        sh -s - agent \
+          --node-label "topology.kubernetes.io/zone=vps" \
+          --node-label "location=public" \
+          --kubelet-arg "max-pods=30"
+    creates: /etc/rancher/k3s/k3s-agent.yaml
+  when: k3s_binary.rc != 0
+
+- name: Verify node joined (check via k3s kubectl on server)
+  command: sudo k3s kubectl get node {{ vps_hostname }} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+  delegate_to: localhost
+  changed_when: false
+  register: node_status
+  when: k3s_binary.rc != 0
+
+- name: Print node status
+  debug:
+    msg: "K3s node {{ vps_hostname }} status: {{ node_status.stdout | default('already verified') }}"

@@ -1,0 +1,109 @@
+---
+- name: set hostname
+  hostname:
+    name: "{{ vps_hostname }}"
+
+- name: set timezone
+  timezone:
+    name: "{{ vps_timezone | default('Asia/Jerusalem') }}"
+
+- name: create and enable swapfile (1GB, idempotent)
+  shell: |
+    set -e
+    if ! grep -q /swapfile /proc/swaps 2>/dev/null; then
+      fallocate -l 1G /swapfile
+      chmod 600 /swapfile
+      mkswap /swapfile
+      swapon /swapfile
+    fi
+  args:
+    creates: /swapfile
+
+- name: add swap to fstab
+  mount:
+    path: none
+    src: /swapfile
+    fstype: swap
+    opts: sw
+    passno: 0
+    dump: 0
+    state: present
+
+- name: install base packages
+  apt:
+    name:
+      - curl
+      - wget
+      - htop
+      - net-tools
+      - ufw
+      - fail2ban
+      - unattended-upgrades
+      - gnupg
+      - ca-certificates
+      - lsb-release
+    state: present
+    update_cache: true
+
+- name: configure UFW — default deny incoming, allow SSH
+  ufw:
+    rule: "{{ item.rule }}"
+    port: "{{ item.port | default(omit) }}"
+    proto: "{{ item.proto | default('tcp') }}"
+  loop:
+    - { rule: 'allow', port: '22', proto: 'tcp' }
+    - { rule: 'deny' }
+  notify: reload ufw
+
+- name: enable UFW
+  ufw:
+    state: enabled
+
+- name: harden SSH — disable password auth
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PasswordAuthentication"
+    line: "PasswordAuthentication no"
+  notify: restart ssh
+
+- name: disable SSH root login (key-only is fine, belt-and-suspenders)
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PermitRootLogin"
+    line: "PermitRootLogin prohibit-password"
+  notify: restart ssh
+
+- name: configure unattended-upgrades (auto security updates)
+  copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Download-Upgradeable-Packages "1";
+      APT::Periodic::AutocleanInterval "7";
+      APT::Periodic::Unattended-Upgrade "1";
+
+- name: configure fail2ban for SSH
+  copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      [DEFAULT]
+      bantime = 1h
+      findtime = 10m
+      maxretry = 5
+
+      [sshd]
+      enabled = true
+      port = 22
+  notify: restart fail2ban
+
+- name: set sysctl tweaks
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: true
+  loop:
+    - { key: net.ipv4.ip_forward, value: '1' }
+    - { key: net.ipv4.tcp_syncookies, value: '1' }
+    - { key: net.core.default_qdisc, value: 'fq' }
+    - { key: net.ipv4.tcp_congestion_control, value: 'bbr' }

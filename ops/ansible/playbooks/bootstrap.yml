@@ -1,0 +1,29 @@
+---
+- name: Bootstrap RackNerd VPS
+  hosts: racknerd-vps
+  gather_facts: true
+  become: true
+
+  pre_tasks:
+    - name: Verify we're on a fresh Ubuntu install
+      fail:
+        msg: "This playbook targets Ubuntu 24.04. Got {{ ansible_distribution }} {{ ansible_distribution_version }}"
+      when: ansible_distribution != 'Ubuntu' or ansible_distribution_version not in ['24.04']
+
+  roles:
+    - role: common
+      tags: [common, base]
+    - role: tailscale
+      tags: [tailscale]
+    - role: k3s
+      tags: [k3s]
+
+  post_tasks:
+    - name: Summary
+      debug:
+        msg:
+          - "✅ VPS bootstrap complete"
+          - "   Host: racknerd-vps (192.210.150.73)"
+          - "   K3s joined to: {{ k3s_server_address }}:{{ k3s_server_port }}"
+          - "   Tailscale: configured"
+          - "   Next: verify with kubectl get nodes on the server"

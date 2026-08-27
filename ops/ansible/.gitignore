@@ -1,0 +1,3 @@
+/ops/ansible/.vault_pass
+/ops/ansible/.facts_cache/
+/ops/ansible/group_vars/all/vault.yml
