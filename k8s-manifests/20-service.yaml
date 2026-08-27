@@ -1,5 +1,6 @@
-# Service for DNS/internal resolution. External access goes through
-# the VPS public IP via hostNetwork. No MetalLB LoadBalancer needed.
+# Type LoadBalancer works with in-cluster MetalLB; allocate from the
+# 192.168.0.60–100 pool for internal cluster access.
+# External access goes through racknerd-vps which DNATs port 25565 to this IP.
 apiVersion: v1
 kind: Service
 metadata:
@@ -8,7 +9,7 @@ metadata:
   labels:
     app: minecraft
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: minecraft
   ports:
@@ -16,5 +17,3 @@ spec:
       port: 25565
       targetPort: game
       protocol: TCP
-      # Optional explicit node port when you prefer predictable local forwarding:
-      # nodePort: 30565

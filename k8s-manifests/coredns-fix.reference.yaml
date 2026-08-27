@@ -1,0 +1,14 @@
+# CoreDNS ConfigMap — fixed to forward to Pi-hole directly (192.168.0.1)
+# instead of /etc/resolv.conf which loops via systemd-resolved.
+# Managed by k3s addon; this is the live config for reference.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-fix
+  namespace: minecraft  # not actually deployed here — just tracking the fix
+data:
+  patch: |
+    forward . /etc/resolv.conf  →  forward . 192.168.0.1
+  reason: |
+    /etc/resolv.conf points to 127.0.0.53 (systemd-resolved) which loops
+    back to CoreDNS on :53. Forwarding directly to the Pi-hole breaks the loop.
