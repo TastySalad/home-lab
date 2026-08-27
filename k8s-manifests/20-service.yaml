@@ -1,5 +1,5 @@
-# Type LoadBalancer works with in-cluster MetalLB; omit or change the annotation
-# to match your MetalLB IP pool, e.g. metallb.universe.tf/loadBalancerIPs: "192.168.1.240"
+# Service for DNS/internal resolution. External access goes through
+# the VPS public IP via hostNetwork. No MetalLB LoadBalancer needed.
 apiVersion: v1
 kind: Service
 metadata:
@@ -8,7 +8,7 @@ metadata:
   labels:
     app: minecraft
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: minecraft
   ports:
