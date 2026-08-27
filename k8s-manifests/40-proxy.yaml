@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft-proxy
+  namespace: minecraft
+  labels:
+    app: minecraft-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minecraft-proxy
+  template:
+    metadata:
+      labels:
+        app: minecraft-proxy
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/hostname: racknerd-vps
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - name: mc-tcp
+              containerPort: 25565
+              hostPort: 25565
+              protocol: TCP
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: minecraft-proxy-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minecraft-proxy-config
+  namespace: minecraft
+  labels:
+    app: minecraft-proxy
+data:
+  nginx.conf: |
+    events {
+      worker_connections 1024;
+    }
+
+    stream {
+      upstream minecraft_backend {
+        server 100.109.95.108:25565;
+      }
+
+      server {
+        listen 25565;
+        proxy_pass minecraft_backend;
+        proxy_protocol off;
+      }
+    }

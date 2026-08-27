@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: tailscale-proxy
+  namespace: minecraft
+  labels:
+    app: tailscale-proxy
+spec:
+  selector:
+    matchLabels:
+      app: tailscale-proxy
+  template:
+    metadata:
+      labels:
+        app: tailscale-proxy
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/hostname: salad-playground
+      containers:
+        - name: proxy
+          image: nginx:alpine
+          ports:
+            - name: mc-tcp
+              containerPort: 25565
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+      volumes:
+        - name: config
+          configMap:
+            name: tailscale-proxy-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tailscale-proxy-config
+  namespace: minecraft
+  labels:
+    app: tailscale-proxy
+data:
+  nginx.conf: |
+    events {
+      worker_connections 1024;
+    }
+
+    stream {
+      upstream backend {
+        server 10.43.236.234:25565;
+      }
+
+      server {
+        listen 100.109.95.108:25565;
+        proxy_pass backend;
+      }
+    }

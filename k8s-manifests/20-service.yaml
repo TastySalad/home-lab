@@ -1,6 +1,5 @@
-# Type LoadBalancer works with in-cluster MetalLB; allocate from the
-# 192.168.0.60–100 pool for internal cluster access.
-# External access goes through racknerd-vps which DNATs port 25565 to this IP.
+# ClusterIP only — external access goes through nginx proxy on racknerd-vps
+# forwarding via Tailscale to the Minecraft pod on salad-playground.
 apiVersion: v1
 kind: Service
 metadata:
@@ -9,7 +8,7 @@ metadata:
   labels:
     app: minecraft
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: minecraft
   ports:
