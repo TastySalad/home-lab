@@ -30,9 +30,13 @@ spec:
             - name: EULA
               value: "TRUE"
             - name: MEMORY
-              value: "2G"
+              value: "1G"
+            - name: JVM_OPTS
+              value: "-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+DisableExplicitGC"
             - name: SERVER_PORT
               value: "25565"
+            - name: OVERRIDE_SERVER_PROPERTIES
+              value: "view-distance=6,max-players=10"
           volumeMounts:
             - name: data
               mountPath: /data
