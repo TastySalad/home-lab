@@ -1,0 +1,29 @@
+# Werewolf — party game. Chart: apps/werewolf (local path).
+# Image is built locally (buildah on salad-playground) and imported into k3s
+# containerd (both `werewolf:1.0.0` and `docker.io/library/werewolf:1.0.0`
+# refs exist), so pullPolicy IfNotPresent works with no registry + no credits.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: werewolf
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:TastySalad/home-lab.git
+    targetRevision: main
+    path: apps/werewolf
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: werewolf
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  helm:
+    releaseName: werewolf
+    valueFiles:
+      - values.yaml

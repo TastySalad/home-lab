@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "werewolf.fullname" . }}
+  labels:
+    {{- include "werewolf.labels" . | nindent 4 }}
+  {{- with .Values.service.loadBalancerIP }}
+  annotations:
+    metallb.io/loadBalancerIPs: {{ . | quote }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "werewolf.selectorLabels" . | nindent 4 }}

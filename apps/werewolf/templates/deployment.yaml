@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "werewolf.fullname" . }}
+  labels:
+    {{- include "werewolf.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate   # single stateful table - never run two at once
+  selector:
+    matchLabels:
+      {{- include "werewolf.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "werewolf.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - salad-playground
+      containers:
+        - name: game
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8090
+              protocol: TCP
+          env:
+            - name: WEREWOLF_PORT
+              value: {{ .Values.env.WEREWOLF_PORT | quote }}
+            - name: NIGHT_SECONDS
+              value: {{ .Values.env.NIGHT_SECONDS | quote }}
+            - name: DAY_DELIB_SECONDS
+              value: {{ .Values.env.DAY_DELIB_SECONDS | quote }}
+            - name: VOTE_SECONDS
+              value: {{ .Values.env.VOTE_SECONDS | quote }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8090
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      terminationGracePeriodSeconds: 10

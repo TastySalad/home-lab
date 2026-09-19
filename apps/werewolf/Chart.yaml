@@ -1,0 +1,18 @@
+apiVersion: v2
+name: werewolf
+description: >-
+  Werewolf — local multiplayer party game (mobile-first web, realtime WS).
+  Single stateful game server (stdlib-Python asyncio HTTP + WebSocket) with a
+  pre-built vanilla-JS frontend baked into the image. One table at a time;
+  players join from their phones on the LAN.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - werewolf
+  - party-game
+  - websocket
+maintainers:
+  - name: TastySalad
+annotations:
+  "helm.sh/category": games

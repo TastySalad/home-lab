@@ -1,0 +1,69 @@
+# Werewolf Helm values — home-lab defaults.
+#
+# Image `werewolf:1.0.0` is built locally (buildah on salad-playground) and
+# imported into k3s's containerd on the target node, so `pullPolicy:
+# IfNotPresent` + no imagePullSecrets is the intended flow. No external
+# registry is involved and no credits are spent.
+
+replicaCount: 1
+
+image:
+  repository: werewolf
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 8090
+  # MetalLB pool is 192.168.0.60-100; .60 (traefik), .61 (vault), .63 (netdata)
+  # are in use. .62 is the werewolf LAN address (phone browsers hit http://192.168.0.62).
+  loadBalancerIP: 192.168.0.62
+
+# Stateful game table — pin to the healthy LAN node ("Blackview" per lab naming).
+# salad-vostro3500 is an offline laptop and must never be a target.
+nodeSelector:
+  kubernetes.io/hostname: salad-playground
+
+tolerations: []
+affinity: {}
+
+# The server is tiny (pure stdlib): ~30-60 MB RSS in real use.
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: "1"
+    memory: 256Mi
+
+env:
+  WEREWOLF_PORT: "8090"
+  # Phone-friendly phase pacing (seconds)
+  NIGHT_SECONDS: "35"
+  DAY_DELIB_SECONDS: "45"
+  VOTE_SECONDS: "120"
+
+# Liveness/readiness hit the static server (any HTTP status means the process
+# is alive; 404 on a path is expected for a raw TCP+HTTP stdlib server, so we
+# treat "got any HTTP response" as alive).
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 3
+  periodSeconds: 15
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 2
+  periodSeconds: 10
+
+# server.py binds 0.0.0.0:$WEREWOLF_PORT directly; no nginx sidecar needed.
+extraArgs: []
