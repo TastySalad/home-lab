@@ -1,0 +1,77 @@
+# Party RSVP site — home-lab defaults.
+#
+# Image `party:1.0.0` is built with docker on the racknerd-vps node and
+# imported into k3s's containerd (both `party:1.0.0` and
+# `docker.io/library/party:1.0.0` refs exist), so pullPolicy IfNotPresent
+# works with no registry and no credits. This mirrors the werewolf image flow.
+#
+# EXPOSURE: this is a PUBLIC site (party.salad-playground.party -> VPS).
+# The deployment runs hostNetwork on the racknerd-vps node and binds the node's
+# port 80 directly (see deployment.yaml). That is the same mechanism as the
+# minecraft-proxy precedent (hostNetwork + hostPort on the VPS). No Ingress,
+# no LoadBalancer, no MetalLB — the node IS the public edge.
+
+replicaCount: 1
+
+image:
+  repository: party
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Bind the node's public HTTP port directly. 80 is chosen because the site is
+# served over a Cloudflare-proxied TLS edge (party.salad-playground.party)
+# which terminates TLS and forwards plain HTTP to us on :80.
+hostPort: 80
+containerPort: 80
+
+# RSVP data persistence. local-path StorageClass on the racknerd-vps node.
+persistence:
+  enabled: true
+  storageClass: local-path   # default on this cluster; explicit for clarity
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  # subPath is the single JSON file the server writes; keep it a leaf.
+  path: rsvps.json
+
+# Owner token gates GET /api/list (the read-only "who's coming" view + CSV).
+# Keep the value in this file (it is a low-value, rotatable secret for a party
+# RSVP list, not an account credential). To rotate: `openssl rand -hex 16`.
+ownerToken: "7c304a66ae7df16ad0823311c5f90ba2"
+
+# Pin to the public node — the site must be reachable on the VPS's IP, and the
+# local-path PVC lives on that node's disk.
+node: racknerd-vps
+nodeSelector:
+  kubernetes.io/hostname: racknerd-vps
+
+tolerations: []
+affinity: {}
+
+# server.py is a tiny stdlib app: ~30-60 MB RSS in real use.
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: "1"
+    memory: 256Mi
+
+# /healthz returns 200 once the server is up (it has a real health route,
+# unlike werewolf — so an HTTP probe is the honest check here).
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 20
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 2
+  periodSeconds: 10

@@ -1,0 +1,35 @@
+# Party RSVP site (NYE 2027). Chart: apps/party (local path).
+#
+# Image `party:1.0.0` is built on the racknerd-vps node (docker) and imported
+# into k3s's containerd, so `pullPolicy: IfNotPresent` works with no registry
+# and no credits. Mirrors the werewolf image flow.
+#
+# EXPOSURE: PUBLIC. The deployment runs hostNetwork on the racknerd-vps node
+# and binds the node's public port 80 (same mechanism as the minecraft-proxy
+# precedent). Cloudflare terminates TLS for party.salad-playground.party and
+# forwards plain HTTP to :80 — no in-cluster ingress/LB needed.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: party
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:TastySalad/home-lab.git
+    targetRevision: main
+    path: apps/party
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: party
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  helm:
+    releaseName: party
+    valueFiles:
+      - values.yaml
