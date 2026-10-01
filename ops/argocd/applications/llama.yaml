@@ -1,6 +1,7 @@
 # llama-swap (brain, 192.168.0.233:11434) — nginx reverse-proxy + Bearer-token auth.
 #   https://llama.manatee-ruffe.ts.net  (tailnet-only; Bearer token required)
-# Manifests: k8s-manifests/llama-*.yaml
+# Manifests: k8s-manifests/llama/  (isolated subdir → invisible to the
+# non-recursive lab-core bundle app, so no double-ownership).
 # NOTE: the Bearer token lives in the k8s Secret `llama-token` (created
 # imperatively, NOT in git). Rotate with:
 #   kubectl -n llama create secret generic llama-token \
@@ -17,10 +18,7 @@ spec:
   source:
     repoURL: git@github.com:TastySalad/home-lab.git
     targetRevision: main
-    path: k8s-manifests
-    directory:
-      include: 'llama-*.yaml'
-      recurse: false
+    path: k8s-manifests/llama
   destination:
     server: https://kubernetes.default.svc
     namespace: llama
