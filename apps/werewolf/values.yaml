@@ -9,7 +9,7 @@ replicaCount: 1
 
 image:
   repository: werewolf
-  tag: "1.1.0"
+  tag: "1.2.0"
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
@@ -43,10 +43,16 @@ resources:
 
 env:
   WEREWOLF_PORT: "8090"
-  # Phone-friendly phase pacing (seconds)
-  NIGHT_SECONDS: "35"
-  DAY_DELIB_SECONDS: "45"
-  VOTE_SECONDS: "120"
+  # 1.2.0 phase pacing (seconds). The night ends the moment every night-actor
+  # has acted; NIGHT_SECONDS is only a hard backstop so one stuck player can't
+  # hold the village hostage. DAY_DELIB is the discussion window; the host can
+  # stretch/shrink it live. The stand/verdict windows are fixed in-code.
+  NIGHT_SECONDS: "120"
+  DAY_DELIB_SECONDS: "90"
+  ACCUSE_THRESHOLD: "3"      # accusations needed to send someone to the stand
+  ACCUSATIONS_PER_DAY: "3"   # stand attempts per day before the town sleeps
+  PLEA_SECONDS: "45"         # pleading time on the stand
+  VERDICT_SECONDS: "60"      # hang/free decision window
 
 # Liveness/readiness hit the static server (any HTTP status means the process
 # is alive; 404 on a path is expected for a raw TCP+HTTP stdlib server, so we
