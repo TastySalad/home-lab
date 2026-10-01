@@ -1,0 +1,17 @@
+# ClusterIP — TLS is terminated by the Tailscale Operator (ts-odysseus pod).
+apiVersion: v1
+kind: Service
+metadata:
+  name: odysseus
+  namespace: odysseus
+  labels:
+    app: odysseus-proxy
+spec:
+  type: ClusterIP
+  selector:
+    app: odysseus-proxy
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP

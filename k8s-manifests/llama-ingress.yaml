@@ -1,0 +1,28 @@
+# Tailnet ingress for llama-swap (brain) — matches the home/cti/werewolf
+# imperative tailscale-ingress pattern (not ArgoCD-managed; applied via kubectl).
+# MagicDNS: https://llama.manatee-ruffe.ts.net
+# Auth: Bearer API-token enforced by the in-pod nginx auth_request gate.
+#   Ollama/OpenAI clients: Authorization: Bearer <llama-token>
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: llama
+  namespace: llama
+  annotations:
+    tailscale.com/hostname: llama
+spec:
+  ingressClassName: tailscale
+  rules:
+    - host: llama.manatee-ruffe.ts.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: llama
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - llama.manatee-ruffe.ts.net

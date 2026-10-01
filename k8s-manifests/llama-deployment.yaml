@@ -1,0 +1,89 @@
+# llama-swap (brain) — reverse-proxy + Bearer-token auth.
+#
+# Brain backend: 192.168.0.233:11434 (raw llama.cpp / Ollama-compatible API),
+# no built-in auth. Two containers in one pod:
+#   - nginx: reverse proxy to the brain, streaming-tuned, fronts the tailnet
+#     at https://llama.manatee-ruffe.ts.net (Tailscale Operator ingress).
+#   - auth: python stdlib sidecar (127.0.0.1:8081) — the nginx auth_request
+#     target. Validates `Authorization: Bearer <token>` against the mounted
+#     Secret `llama-token` (key `token`). The token is NOT in any ConfigMap/git.
+#
+# Pinned to salad-playground: only node that routes to the 192.168.0.0/24 LAN.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llama-proxy
+  namespace: llama
+  labels:
+    app: llama-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: llama-proxy
+  template:
+    metadata:
+      labels:
+        app: llama-proxy
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: salad-playground
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 300m
+              memory: 128Mi
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+        - name: auth
+          image: python:alpine
+          command: ["python", "/auth/auth_server.py"]
+          env:
+            - name: LLAMA_TOKEN_FILE
+              value: /etc/llama/token
+            - name: AUTH_PORT
+              value: "8081"
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          volumeMounts:
+            - name: auth-script
+              mountPath: /auth
+              readOnly: true
+            - name: llama-token
+              mountPath: /etc/llama
+              readOnly: true
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: llama-nginx-config
+        - name: auth-script
+          configMap:
+            name: llama-auth-script
+        - name: llama-token
+          secret:
+            secretName: llama-token

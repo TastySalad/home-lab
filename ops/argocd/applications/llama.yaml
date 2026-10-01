@@ -1,0 +1,33 @@
+# llama-swap (brain, 192.168.0.233:11434) — nginx reverse-proxy + Bearer-token auth.
+#   https://llama.manatee-ruffe.ts.net  (tailnet-only; Bearer token required)
+# Manifests: k8s-manifests/llama-*.yaml
+# NOTE: the Bearer token lives in the k8s Secret `llama-token` (created
+# imperatively, NOT in git). Rotate with:
+#   kubectl -n llama create secret generic llama-token \
+#     --from-literal=token=$(openssl rand -hex 24) --dry-run=client -o yaml | kubectl apply -f -
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: llama
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:TastySalad/home-lab.git
+    targetRevision: main
+    path: k8s-manifests
+    directory:
+      include: 'llama-*.yaml'
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: llama
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

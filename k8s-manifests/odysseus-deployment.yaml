@@ -1,0 +1,58 @@
+# Odysseus (self-hosted AI workspace) — reverse-proxy pod.
+#
+# The app itself stays a host process on salad-playground (venv + systemd
+# unit `odysseus-ui`, 879M data dir); this nginx pod only fronts it over the
+# tailnet at https://odysseus.manatee-ruffe.ts.net (Tailscale Operator ingress).
+#
+# Auth: the app's own login (AUTH_ENABLED=true in its .env). No proxy-layer auth.
+# Pinned to salad-playground: it is the only node that routes to 192.168.0.0/24.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: odysseus-proxy
+  namespace: odysseus
+  labels:
+    app: odysseus-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: odysseus-proxy
+  template:
+    metadata:
+      labels:
+        app: odysseus-proxy
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: salad-playground
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: odysseus-nginx-config

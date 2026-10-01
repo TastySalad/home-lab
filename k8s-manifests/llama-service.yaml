@@ -1,0 +1,17 @@
+# ClusterIP — TLS terminated by Tailscale Operator (ts-llama pod).
+apiVersion: v1
+kind: Service
+metadata:
+  name: llama
+  namespace: llama
+  labels:
+    app: llama-proxy
+spec:
+  type: ClusterIP
+  selector:
+    app: llama-proxy
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP

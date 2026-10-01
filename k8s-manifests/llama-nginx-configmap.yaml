@@ -1,0 +1,84 @@
+# nginx reverse-proxy for llama-swap (brain: 192.168.0.233:11434, raw llama.cpp,
+# Ollama-compatible API).
+#
+# - Bearer-token gate via auth_request to the in-pod python auth sidecar
+#   (127.0.0.1:8081/auth). The expected token lives ONLY in the k8s Secret
+#   `llama-token` (created imperatively, never in git) and is read by the
+#   sidecar — it is not present in this ConfigMap.
+# - Streaming-tuned for LLM token streaming: buffering off, long read timeout,
+#   chunked transfer on, no gzip (would buffer the stream).
+# - WebSocket-safe (Upgrade/Connection) for any WS endpoints.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llama-nginx-config
+  namespace: llama
+  labels:
+    app: llama
+data:
+  nginx.conf: |
+    events {
+      worker_connections 1024;
+    }
+
+    http {
+      include /etc/nginx/mime.types;
+
+      upstream llama_backend {
+        # brain node, same LAN (192.168.0.0/24). Pinned to salad-playground,
+        # the only node that routes there directly.
+        server 192.168.0.233:11434;
+        keepalive 16;
+      }
+
+      # 401 for missing/bad token, 403 for auth-side error.
+      error_page 401 = @unauth;
+      error_page 403 = @forbidden;
+
+      server {
+        listen 80;
+        client_max_body_size 2048m;
+
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_http_version 1.1;
+        gzip off;
+
+        # Real API traffic
+        location / {
+          auth_request /auth;
+          proxy_pass http://llama_backend;
+          proxy_set_header Host $host;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+          proxy_set_header X-Forwarded-Proto https;
+          proxy_set_header X-Forwarded-For $remote_addr;
+          proxy_set_header X-Forwarded-Host $host;
+          proxy_read_timeout 3600s;
+          proxy_send_timeout 3600s;
+          proxy_connect_timeout 10s;
+          chunked_transfer_encoding on;
+        }
+
+        # auth_request subrequest target (internal only). Forwards the client's
+        # Authorization header to the python sidecar for validation.
+        location = /auth {
+          internal;
+          proxy_pass http://127.0.0.1:8081/auth;
+          proxy_pass_request_body off;
+          proxy_set_header Content-Length "";
+          proxy_set_header Authorization $http_authorization;
+          proxy_set_header X-Original-URI $request_uri;
+        }
+
+        location @unauth {
+          default_type application/json;
+          add_header WWW-Authenticate Bearer;
+          return 401 '{"error":"unauthorized: missing or invalid Authorization: Bearer <llama-token>"}';
+        }
+        location @forbidden {
+          default_type application/json;
+          return 403 '{"error":"forbidden: llama token auth failed"}';
+        }
+      }
+    }

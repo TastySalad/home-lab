@@ -1,0 +1,30 @@
+# Odysseus — self-hosted AI workspace (host venv app on salad-playground).
+# nginx reverse-proxy pod + Tailscale Operator ingress.
+#   https://odysseus.manatee-ruffe.ts.net  (tailnet-only, app login is the auth)
+# Manifests: k8s-manifests/odysseus-*.yaml (imperative-apply pattern, ArgoCD-managed).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: odysseus
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:TastySalad/home-lab.git
+    targetRevision: main
+    path: k8s-manifests
+    directory:
+      include: 'odysseus-*.yaml'
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: odysseus
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

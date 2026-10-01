@@ -1,0 +1,27 @@
+# Tailnet ingress for Odysseus — matches the home/cti/werewolf imperative
+# tailscale-ingress pattern (not ArgoCD-managed; applied via kubectl).
+# MagicDNS: https://odysseus.manatee-ruffe.ts.net
+# Auth: the app's own login (AUTH_ENABLED=true). Tailnet membership is the outer gate.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: odysseus
+  namespace: odysseus
+  annotations:
+    tailscale.com/hostname: odysseus
+spec:
+  ingressClassName: tailscale
+  rules:
+    - host: odysseus.manatee-ruffe.ts.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: odysseus
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - odysseus.manatee-ruffe.ts.net
